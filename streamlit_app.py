@@ -4,7 +4,13 @@ import streamlit as st
 from score import score
 
 if __name__ == '__main__':
-    st.title('Letterscord')
+    col1, mid, col2 = st.columns([1, 1, 13])
+    with col1:
+        st.image('img/letterboxd-stars.png', width=100)
+    with col2:
+        st.title('Letterscord')
+
+    #st.title('Letterscord')
     st.text('[letterboxd-review-scorer]')
 
     input = st.text_area('', placeholder='Write your review here.')
