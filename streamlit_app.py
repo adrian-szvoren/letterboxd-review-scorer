@@ -3,7 +3,16 @@ import streamlit as st
 
 from score import score
 
+
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
 if __name__ == '__main__':
+    st.set_page_config(page_title='Letterscord', page_icon='img/letterboxd-stars.png', layout='centered')
+    local_css('style.css')
+
     col1, mid, col2 = st.columns([1, 1, 13])
     with col1:
         st.image('img/letterboxd-stars.png', width=100)
