@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     input = st.text_area('', placeholder='Write your review here.')
     button = st.button('Calculate')
-    if input and button:
+    if input or button:
         score = score(input)[0]
         score_lb = math.ceil(10*score)/2
         stars = '★' * math.floor(score_lb)
