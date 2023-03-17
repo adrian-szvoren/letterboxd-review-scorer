@@ -4,22 +4,10 @@ import streamlit as st
 from score import score
 
 
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-
 if __name__ == '__main__':
-    st.set_page_config(page_title='Letterscord', page_icon='img/letterboxd-stars.png', layout='centered')
-    local_css('style.css')
+    st.set_page_config(page_title='Letterscord', page_icon='img/letterboxd-stars-circle.png', layout='centered')
 
-    col1, mid, col2 = st.columns([1, 1, 13])
-    with col1:
-        st.image('img/letterboxd-stars.png', width=100)
-    with col2:
-        st.title('Letterscord')
-
-    #st.title('Letterscord')
+    st.image('img/letterboxd-stars-title.png', width=400)
     st.text('[letterboxd-review-scorer]')
 
     input = st.text_area('', placeholder='Write your review here.')
