@@ -1,8 +1,9 @@
 [theme]
 
 # Primary accent for interactive elements
+primaryColor = '#FCC201'
 # primaryColor = '#F27405'  # orange
-primaryColor = '#00B021'  # green
+# primaryColor = '#00B021'  # green
 # primaryColor = '#40bcf4'  # blue
 
 # Background color for the main content area
