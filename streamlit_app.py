@@ -7,7 +7,7 @@ from score import score
 if __name__ == '__main__':
     st.set_page_config(page_title='Letterscord', page_icon='img/letterboxd-stars-circle.png', layout='centered')
 
-    st.image('img/letterboxd-stars-title.png', width=400)
+    st.image('img/letterboxd-stars-title.png', width=350)
     st.text('[letterboxd-review-scorer]')
 
     input = st.text_area('', placeholder='Write your review here.')
