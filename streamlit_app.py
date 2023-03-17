@@ -10,13 +10,13 @@ if __name__ == '__main__':
     st.image('img/letterboxd-stars-title.png', width=350)
     st.text('[letterboxd-review-scorer]')
 
-    input = st.text_area('', placeholder='Write your review here.')
+    input = st.text_area('Review text area', placeholder='Write your review here.', label_visibility='hidden')
     button = st.button('Calculate')
     if input or button:
         score = score(input)[0]
         score_lb = math.ceil(10*score)/2
         stars = '★' * math.floor(score_lb)
-        if score_lb%1 == 0.5:
+        if score_lb % 1 == 0.5:
             stars += '½'
         stars += '☆'*math.floor(5-score_lb)
 
