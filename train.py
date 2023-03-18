@@ -90,6 +90,16 @@ def get_accuracy(prediction, label):
     return accuracy
 
 
+def plot_and_save_metrics(name, train_metrics, valid_metrics):
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(train_metrics, label=f'train {name}')
+    ax.plot(valid_metrics, label=f'valid {name}')
+    plt.legend()
+    ax.set_xlabel('updates')
+    ax.set_ylabel(name)
+    plt.savefig(f"{config['OUTPUT']['figures']}/{config['MODEL']['name']}_{date.today()}_{name}.png")
+
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -181,20 +191,5 @@ if __name__ == '__main__':
         print(f'train_loss: {epoch_train_loss:.3f}, train_acc: {epoch_train_acc:.3f}')
         print(f'valid_loss: {epoch_valid_loss:.3f}, valid_acc: {epoch_valid_acc:.3f}')
 
-    fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(train_losses, label='train loss')
-    ax.plot(valid_losses, label='valid loss')
-    plt.legend()
-    ax.set_xlabel('updates')
-    ax.set_ylabel('loss')
-    plt.savefig(f"{config['OUTPUT']['figures']}/valid_loss_{date.today()}.png")
-
-    fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(train_accs, label='train accuracy')
-    ax.plot(valid_accs, label='valid accuracy')
-    plt.legend()
-    ax.set_xlabel('updates')
-    ax.set_ylabel('accuracy')
-    plt.savefig(f"{config['OUTPUT']['figures']}/valid_accuracy_{date.today()}.png")
+    plot_and_save_metrics('loss', train_losses, valid_losses)
+    plot_and_save_metrics('accuracy', train_accs, valid_accs)
