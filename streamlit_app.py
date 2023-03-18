@@ -23,7 +23,7 @@ def load_resources():
     output_dim = 10
     model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
     tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
-    model.load_state_dict(torch.load(config['MODEL']['path']))
+    model.load_state_dict(torch.load(config['MODEL']['path']), device)
 
     return model, tokenizer, vocab, device
 
