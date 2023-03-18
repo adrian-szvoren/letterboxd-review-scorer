@@ -14,12 +14,13 @@ import tqdm
 from datasets import Dataset
 from datetime import date
 
-from model import NBoW
+from model import NBoW, LSTM
 
 
 def tokenize_example(example, tokenizer, max_length):
     tokens = tokenizer(example['text'])[:max_length]
-    return {'tokens': tokens}
+    length = len(tokens)
+    return {'tokens': tokens, 'length': length}
 
 
 def numericalize_data(example, vocab):
@@ -30,10 +31,13 @@ def numericalize_data(example, vocab):
 def collate(batch, pad_index):
     batch_ids = [i['ids'] for i in batch]
     batch_ids = nn.utils.rnn.pad_sequence(batch_ids, padding_value=pad_index, batch_first=True)
+    batch_length = [i['length'] for i in batch]
+    batch_length = torch.stack(batch_length)
     batch_label = [i['label'] for i in batch]
     batch_label = torch.stack(batch_label)
     batch = {
         'ids': batch_ids,
+        'length': batch_length,
         'label': batch_label
     }
     return batch
@@ -51,8 +55,9 @@ def train(dataloader, model, criterion, optimizer, device):
 
     for batch in tqdm.tqdm(dataloader, desc='training...', file=sys.stdout):
         ids = batch['ids'].to(device)
+        length = batch['length']
         label = batch['label'].to(device)
-        prediction = model(ids)
+        prediction = model(ids, length)
         loss = criterion(prediction, label)
         accuracy = get_accuracy(prediction, label)
         optimizer.zero_grad()
@@ -72,8 +77,9 @@ def evaluate(dataloader, model, criterion, device):
     with torch.no_grad():
         for batch in tqdm.tqdm(dataloader, desc='evaluating...', file=sys.stdout):
             ids = batch['ids'].to(device)
+            length = batch['length']
             label = batch['label'].to(device)
-            prediction = model(ids)
+            prediction = model(ids, length)
             loss = criterion(prediction, label)
             accuracy = get_accuracy(prediction, label)
             epoch_losses.append(loss.item())
@@ -135,10 +141,10 @@ if __name__ == '__main__':
     train_data = train_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
     valid_data = valid_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
 
-    train_data = train_data.with_format(type='torch', columns=['ids', 'label'])
-    valid_data = valid_data.with_format(type='torch', columns=['ids', 'label'])
+    train_data = train_data.with_format(type='torch', columns=['ids', 'label', 'length'])
+    valid_data = valid_data.with_format(type='torch', columns=['ids', 'label', 'length'])
 
-    batch_size = 512
+    batch_size = 256
     collate = functools.partial(collate, pad_index=pad_index)
     train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, collate_fn=collate, shuffle=True)
     valid_dataloader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, collate_fn=collate)
@@ -146,15 +152,28 @@ if __name__ == '__main__':
     vocab_size = len(vocab)
     embedding_dim = 300
     output_dim = len(train_data.unique('label'))
-
-    model = NBoW(vocab_size, embedding_dim, output_dim, pad_index)
-    print(f'The model has {count_parameters(model):,} trainable parameters')
+    model_name = config['MODEL']['name']
+    if model_name == 'nbow':
+        model = NBoW(vocab_size, embedding_dim, output_dim, pad_index)
+        print(f'Using the NBoW model with {count_parameters(model):,} trainable parameters')
+    elif model_name == 'lstm':
+        hidden_dim = 300
+        n_layers = 2
+        bidirectional = True
+        dropout_rate = 0.5
+        model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
+                     pad_index)
+        model.initialize_weights()
+    else:
+        raise Exception('Model unknown')
+    print(f'Using the {model_name} model with {count_parameters(model):,} trainable parameters')
 
     vectors = torchtext.vocab.FastText()
     pretrained_embedding = vectors.get_vecs_by_tokens(vocab.get_itos())
     model.embedding.weight.data = pretrained_embedding
 
-    optimizer = optim.Adam(model.parameters())
+    lr = 5e-4
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
