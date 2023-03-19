@@ -2,10 +2,7 @@ import altair as alt
 import configparser
 import math
 import streamlit as st
-import torch
-import torchtext
 
-from model import NBoW, LSTM, CNN
 from predict import load_models, predict_score
 
 

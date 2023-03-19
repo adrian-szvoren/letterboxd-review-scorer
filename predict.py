@@ -51,7 +51,7 @@ def load_models(config):
     else:
         raise Exception('Model unknown... change the model name in config.ini')
     tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
-    model.load_state_dict(torch.load(config['MODEL']['path']))
+    model.load_state_dict(torch.load(config['MODEL']['path'], map_location=device))
     return model, tokenizer, vocab, device, min_length, pad_index
 
 
