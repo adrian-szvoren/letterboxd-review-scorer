@@ -201,7 +201,7 @@ if __name__ == '__main__':
     model = model.to(device)
     criterion = criterion.to(device)
 
-    n_epochs = 10
+    n_epochs = 20
     best_valid_loss = float('inf')
     losses = []
     accuracies = []

@@ -62,13 +62,14 @@ if __name__ == '__main__':
     model, tokenizer, vocab, device, min_length, pad_index = load_models(config)
 
     texts = [
+        'terrible',
         'not bad, terrible',
-        # 'bad',
-        # 'good',
-        # 'great',
-        # 'perfect',
-        # 'incredible',
-        # 'unique'
+        'bad',
+        'good',
+        'great',
+        'perfect',
+        'incredible',
+        'unique'
     ]
 
     for text in texts:

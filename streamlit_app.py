@@ -20,7 +20,6 @@ def scale_scores(scores, platform):
         scores['score'] = scores['score'] * 10
     else:
         raise RuntimeError
-
     scores['confidence'] = round(100 * scores['confidence'], 2)
     return scores
 
