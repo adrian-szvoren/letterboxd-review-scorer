@@ -8,7 +8,7 @@ class NBoW(nn.Module):
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_index)
         self.fc = nn.Linear(embedding_dim, output_dim)
 
-    def forward(self, ids):
+    def forward(self, ids, length):
         # ids = [batch size, seq len]
         embedded = self.embedding(ids)
         # embedded = [batch size, seq len, embedding dim]
@@ -48,5 +48,34 @@ class LSTM(nn.Module):
             hidden = self.dropout(hidden[-1])
             # hidden = [batch size, hidden dim]
         prediction = self.fc(hidden)
+        # prediction = [batch size, output dim]
+        return prediction
+
+
+class CNN(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, dropout_rate,
+                 pad_index):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_index)
+        self.convs = nn.ModuleList([nn.Conv1d(embedding_dim,
+                                              n_filters,
+                                              filter_size)
+                                    for filter_size in filter_sizes])
+        self.fc = nn.Linear(len(filter_sizes) * n_filters, output_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, ids, length):
+        # ids = [batch size, seq len]
+        embedded = self.dropout(self.embedding(ids))
+        # embedded = [batch size, seq len, embedding dim]
+        embedded = embedded.permute(0, 2, 1)
+        # embedded = [batch size, embedding dim, seq len]
+        conved = [torch.relu(conv(embedded)) for conv in self.convs]
+        # conved_n = [batch size, n filters, seq len - filter_sizes[n] + 1]
+        pooled = [conv.max(dim=-1).values for conv in conved]
+        # pooled_n = [batch size, n filters]
+        cat = self.dropout(torch.cat(pooled, dim=-1))
+        # cat = [batch size, n filters * len(filter_sizes)]
+        prediction = self.fc(cat)
         # prediction = [batch size, output dim]
         return prediction

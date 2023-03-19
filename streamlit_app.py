@@ -1,40 +1,17 @@
 import altair as alt
 import configparser
 import math
-import matplotlib.pyplot as plt
 import streamlit as st
 import torch
 import torchtext
 
-from model import NBoW, LSTM
-from predict import predict_score
+from model import NBoW, LSTM, CNN
+from predict import load_models, predict_score
 
 
 @st.cache_resource
-def load_resources(config):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    vocab = torch.load(config['VOCAB']['path'])
-    vocab_size = len(vocab)
-    pad_index = vocab['<pad>']
-    embedding_dim = 300
-    output_dim = 10
-    model_name = config['MODEL']['name']
-    if model_name == 'nbow':
-        model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
-    elif model_name == 'lstm':
-        hidden_dim = 300
-        n_layers = 2
-        bidirectional = True
-        dropout_rate = 0
-        model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
-                     pad_index).to(device)
-    else:
-        raise Exception('Model unknown... change the model name in config.ini')
-    tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
-    model.load_state_dict(torch.load(config['MODEL']['path'], map_location=device))
-
-    return model, tokenizer, vocab, device
+def st_load_models(config):
+    return load_models(config)
 
 
 def scale_scores(scores, platform):
@@ -60,7 +37,7 @@ if __name__ == '__main__':
     st.text('[letterboxd-review-scorer]')
 
     config_dict = {s: dict(config.items(s)) for s in config.sections()}
-    model, tokenizer, vocab, device = load_resources(config_dict)
+    model, tokenizer, vocab, device, min_length, pad_index = st_load_models(config_dict)
 
     text_input = st.text_area(
         'Review text area',
@@ -81,7 +58,7 @@ if __name__ == '__main__':
 
     scores = None
     try:
-        scores = predict_score(text_input, model, tokenizer, vocab, device)
+        scores = predict_score(text_input, model, tokenizer, vocab, device, min_length, pad_index)
         scores = scale_scores(scores, platform)
         top = scores.iloc[scores['confidence'].idxmax()]
 

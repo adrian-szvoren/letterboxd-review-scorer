@@ -14,7 +14,7 @@ import tqdm
 from datasets import Dataset
 from datetime import date
 
-from model import NBoW, LSTM
+from model import NBoW, LSTM, CNN
 
 
 def tokenize_example(example, tokenizer, max_length):
@@ -57,6 +57,9 @@ def initialize_weights(m):
                 nn.init.zeros_(param)
             elif 'weight' in name:
                 nn.init.orthogonal_(param)
+    elif isinstance(m, nn.Conv1d):
+        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+        nn.init.zeros_(m.bias)
 
 
 def train(dataloader, model, criterion, optimizer, device):
@@ -175,6 +178,12 @@ if __name__ == '__main__':
         dropout_rate = 0.5
         model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
                      pad_index)
+        model.apply(initialize_weights)
+    if model_name == 'cnn':
+        n_filters = 100
+        filter_sizes = [3, 5, 7]
+        dropout_rate = 0.25
+        model = CNN(vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, dropout_rate, pad_index)
         model.apply(initialize_weights)
     else:
         raise Exception('Model unknown... change the model name in config.ini')
