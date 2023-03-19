@@ -50,16 +50,3 @@ class LSTM(nn.Module):
         prediction = self.fc(hidden)
         # prediction = [batch size, output dim]
         return prediction
-
-    def initialize_weights(self):
-        if isinstance(self, nn.Linear):
-            nn.init.xavier_normal_(self.weight)
-            nn.init.zeros_(self.bias)
-        elif isinstance(self, nn.LSTM):
-            for name, param in self.named_parameters():
-                if 'bias' in name:
-                    nn.init.zeros_(param)
-                elif 'weight' in name:
-                    nn.init.orthogonal_(param)
-
-

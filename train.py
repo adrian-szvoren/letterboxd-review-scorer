@@ -47,6 +47,18 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def initialize_weights(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_normal_(m.weight)
+        nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.LSTM):
+        for name, param in m.named_parameters():
+            if 'bias' in name:
+                nn.init.zeros_(param)
+            elif 'weight' in name:
+                nn.init.orthogonal_(param)
+
+
 def train(dataloader, model, criterion, optimizer, device):
 
     model.train()
@@ -82,8 +94,8 @@ def evaluate(dataloader, model, criterion, device):
             prediction = model(ids, length)
             loss = criterion(prediction, label)
             accuracy = get_accuracy(prediction, label)
-            epoch_losses.append(loss.item())
-            epoch_accs.append(accuracy.item())
+            epoch_losses.append(10*[loss.item()])
+            epoch_accs.append(10*[accuracy.item()])
 
     return epoch_losses, epoch_accs
 
@@ -96,13 +108,13 @@ def get_accuracy(prediction, label):
     return accuracy
 
 
-def plot_and_save_metrics(name, train_metrics, valid_metrics):
+def plot_and_save_metrics(name, metric_dict):
+    metric_df = pd.DataFrame(metric_dict).set_index('epoch')
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(train_metrics, label=f'train {name}')
-    ax.plot(valid_metrics, label=f'valid {name}')
-    plt.legend()
-    ax.set_xlabel('updates')
+    ax.plot(metric_df)
+    plt.legend(metric_df.columns)
+    ax.set_xlabel('epoch')
     ax.set_ylabel(name)
     plt.savefig(f"{config['OUTPUT']['figures']}/{config['MODEL']['name']}_{date.today()}_{name}.png")
 
@@ -144,7 +156,7 @@ if __name__ == '__main__':
     train_data = train_data.with_format(type='torch', columns=['ids', 'label', 'length'])
     valid_data = valid_data.with_format(type='torch', columns=['ids', 'label', 'length'])
 
-    batch_size = 256
+    batch_size = 64
     collate = functools.partial(collate, pad_index=pad_index)
     train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, collate_fn=collate, shuffle=True)
     valid_dataloader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, collate_fn=collate)
@@ -163,9 +175,9 @@ if __name__ == '__main__':
         dropout_rate = 0.5
         model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
                      pad_index)
-        model.initialize_weights()
+        model.apply(initialize_weights)
     else:
-        raise Exception('Model unknown')
+        raise Exception('Model unknown... change the model name in config.ini')
     print(f'Using the {model_name} model with {count_parameters(model):,} trainable parameters')
 
     vectors = torchtext.vocab.FastText()
@@ -182,25 +194,28 @@ if __name__ == '__main__':
 
     n_epochs = 10
     best_valid_loss = float('inf')
-
-    train_losses = []
-    train_accs = []
-    valid_losses = []
-    valid_accs = []
+    losses = []
+    accuracies = []
 
     for epoch in range(n_epochs):
         train_loss, train_acc = train(train_dataloader, model, criterion, optimizer, device)
         valid_loss, valid_acc = evaluate(valid_dataloader, model, criterion, device)
 
-        train_losses.extend(train_loss)
-        train_accs.extend(train_acc)
-        valid_losses.extend(valid_loss)
-        valid_accs.extend(valid_acc)
-
         epoch_train_loss = np.mean(train_loss)
         epoch_train_acc = np.mean(train_acc)
         epoch_valid_loss = np.mean(valid_loss)
         epoch_valid_acc = np.mean(valid_acc)
+
+        losses.append({
+            'epoch': epoch + 1,
+            'train_loss': epoch_train_loss,
+            'valid_loss': epoch_valid_loss
+        })
+        accuracies.append({
+            'epoch': epoch + 1,
+            'train_acc': epoch_train_acc,
+            'valid_acc': epoch_valid_acc
+        })
 
         if epoch_valid_loss < best_valid_loss:
             best_valid_loss = epoch_valid_loss
@@ -210,5 +225,5 @@ if __name__ == '__main__':
         print(f'train_loss: {epoch_train_loss:.3f}, train_acc: {epoch_train_acc:.3f}')
         print(f'valid_loss: {epoch_valid_loss:.3f}, valid_acc: {epoch_valid_acc:.3f}')
 
-    plot_and_save_metrics('loss', train_losses, valid_losses)
-    plot_and_save_metrics('accuracy', train_accs, valid_accs)
+    plot_and_save_metrics('loss', losses)
+    plot_and_save_metrics('accuracy', accuracies)

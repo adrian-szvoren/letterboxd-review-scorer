@@ -6,14 +6,12 @@ import streamlit as st
 import torch
 import torchtext
 
-from model import NBoW
+from model import NBoW, LSTM
 from predict import predict_score
 
 
 @st.cache_resource
-def load_resources():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
+def load_resources(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     vocab = torch.load(config['VOCAB']['path'])
@@ -21,7 +19,18 @@ def load_resources():
     pad_index = vocab['<pad>']
     embedding_dim = 300
     output_dim = 10
-    model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
+    model_name = config['MODEL']['name']
+    if model_name == 'nbow':
+        model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
+    elif model_name == 'lstm':
+        hidden_dim = 300
+        n_layers = 2
+        bidirectional = True
+        dropout_rate = 0
+        model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
+                     pad_index).to(device)
+    else:
+        raise Exception('Model unknown... change the model name in config.ini')
     tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
     model.load_state_dict(torch.load(config['MODEL']['path'], map_location=device))
 
@@ -33,8 +42,10 @@ def scale_scores(scores, platform):
         scores['score'] = scores['score'] / 2
     elif 'IMDB' in platform:
         pass
-    elif 'Rotten Tomatoes':
+    elif 'Rotten Tomatoes' in platform:
         scores['score'] = scores['score'] * 10
+    else:
+        raise RuntimeError
 
     scores['confidence'] = round(100 * scores['confidence'], 2)
     return scores
@@ -42,11 +53,14 @@ def scale_scores(scores, platform):
 
 if __name__ == '__main__':
     st.set_page_config(page_title='Letterscord', page_icon=':star:')
+    config = configparser.ConfigParser()
+    config.read('config.ini')
 
     st.title('Letterscord')
     st.text('[letterboxd-review-scorer]')
 
-    model, tokenizer, vocab, device = load_resources()
+    config_dict = {s: dict(config.items(s)) for s in config.sections()}
+    model, tokenizer, vocab, device = load_resources(config_dict)
 
     text_input = st.text_area(
         'Review text area',
@@ -65,6 +79,7 @@ if __name__ == '__main__':
         label_visibility='collapsed'
     )
 
+    scores = None
     try:
         scores = predict_score(text_input, model, tokenizer, vocab, device)
         scores = scale_scores(scores, platform)
@@ -86,6 +101,8 @@ if __name__ == '__main__':
             else:
                 score_rt_verbal = ':microbe:'
             score_verbal = f'{score_rt_verbal} {score}%'
+        else:
+            raise RuntimeError
         st.subheader(f'Movie score: {score_verbal}')
 
         with st.expander('Score confidence details'):
@@ -99,5 +116,5 @@ if __name__ == '__main__':
                 )
             )
             st.altair_chart(plot, use_container_width=True)
-    except TypeError:
+    except RuntimeError or TypeError:
         pass

@@ -4,14 +4,15 @@ import pandas as pd
 import torch
 import torchtext
 
-from model import NBoW
+from model import NBoW, LSTM
 
 
 def predict_score(text, model, tokenizer, vocab, device):
     tokens = tokenizer(text)
     ids = [vocab[t] for t in tokens]
+    length = torch.LongTensor([len(ids)])
     tensor = torch.LongTensor(ids).unsqueeze(dim=0).to(device)
-    prediction = model(tensor).squeeze(dim=0)
+    prediction = model(tensor, length).squeeze(dim=0)
     probability = torch.softmax(prediction, dim=-1)
     scores = []
     for x in range(10):
@@ -29,7 +30,18 @@ if __name__ == '__main__':
     pad_index = vocab['<pad>']
     embedding_dim = 300
     output_dim = 10
-    model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
+    model_name = config['MODEL']['name']
+    if model_name == 'nbow':
+        model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
+    elif model_name == 'lstm':
+        hidden_dim = 300
+        n_layers = 2
+        bidirectional = True
+        dropout_rate = 0.5
+        model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
+                     pad_index).to(device)
+    else:
+        raise Exception('Model unknown... change the model name in config.ini')
     tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
 
     model.load_state_dict(torch.load(config['MODEL']['path']))
