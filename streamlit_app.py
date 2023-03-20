@@ -14,10 +14,10 @@ def st_load_models(config):
 def scale_scores(scores, platform):
     if 'Letterboxd' in platform:
         scores['score'] = scores['score'] / 2
-    elif 'IMDB' in platform:
-        pass
-    elif 'Rotten Tomatoes' in platform:
-        scores['score'] = scores['score'] * 10
+    # elif 'IMDB' in platform:
+    #     pass
+    # elif 'Rotten Tomatoes' in platform:
+    #     scores['score'] = scores['score'] * 10
     else:
         raise RuntimeError
     scores['confidence'] = round(100 * scores['confidence'], 2)
@@ -70,14 +70,14 @@ if __name__ == '__main__':
                     stars += '½'
                 stars += '☆' * math.floor(5 - score)
                 score_verbal = f'{stars} ({score})'
-            elif 'IMDB' in platform:
-                score_verbal = f':star: **{int(score)}**/10'
-            elif 'Rotten Tomatoes' in platform:
-                if score >= 60:
-                    score_rt_verbal = ':tomato:'
-                else:
-                    score_rt_verbal = ':microbe:'
-                score_verbal = f'{score_rt_verbal} {score}%'
+            # elif 'IMDB' in platform:
+            #     score_verbal = f':star: **{int(score)}**/10'
+            # elif 'Rotten Tomatoes' in platform:
+            #     if score >= 60:
+            #         score_rt_verbal = ':tomato:'
+            #     else:
+            #         score_rt_verbal = ':microbe:'
+            #     score_verbal = f'{score_rt_verbal} {score}%'
             else:
                 raise RuntimeError
             st.subheader(f'Movie score: {score_verbal}')
@@ -89,8 +89,8 @@ if __name__ == '__main__':
                 y=alt.Y('confidence:Q', title='confidence (%)'),
                 color=alt.condition(
                     alt.FieldOneOfPredicate('score', [score]),
-                    alt.value('#FCC201'),
-                    alt.value('#14171C')
+                    alt.value(st.get_option('theme.primaryColor')),
+                    alt.value(st.get_option('theme.secondaryBackgroundColor'))
                 )
             )
             st.altair_chart(plot, use_container_width=True)
