@@ -3,8 +3,9 @@ import configparser
 import pandas as pd
 import torch
 import torchtext
+import transformers
 
-from model import NBoW, LSTM, CNN
+from model import NBoW, LSTM, CNN, Transformer
 
 
 def predict_score(text, model, tokenizer, vocab, device, min_length, pad_index):
@@ -35,19 +36,24 @@ def load_models(config):
     if model_name == 'nbow':
         model = NBoW(vocab_size, embedding_dim, output_dim, pad_index).to(device)
     elif model_name == 'lstm':
-        hidden_dim = 300
-        n_layers = 2
-        bidirectional = True
-        dropout_rate = 0.5
+        hidden_dim = int(config['LSTM']['hidden_dim'])
+        n_layers = int(config['LSTM']['n_layers'])
+        bidirectional = eval(config['LSTM']['bidirectional'])
+        dropout_rate = 0
         model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
                      pad_index).to(device)
     elif model_name == 'cnn':
-        n_filters = 100
-        filter_sizes = [3, 5, 7]
+        n_filters = int(config['CNN']['n_filters'])
+        filter_sizes = eval(config['CNN']['filter_sizes'])
         min_length = max(filter_sizes)
         dropout_rate = 0
         model = CNN(vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, dropout_rate,
                     pad_index).to(device)
+    elif model_name == 'transformer':
+        transformer_name = config['TRANSFORMER']['name']
+        freeze = True
+        transformer = transformers.AutoModel.from_pretrained(transformer_name)
+        model = Transformer(transformer, output_dim, freeze).to(device)
     else:
         raise Exception('Model unknown... change the model name in config.ini')
     tokenizer = torchtext.data.utils.get_tokenizer("basic_english")

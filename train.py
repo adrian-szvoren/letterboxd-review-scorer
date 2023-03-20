@@ -10,11 +10,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torchtext
 import tqdm
+import transformers
 
 from datasets import Dataset
 from datetime import date
 
-from model import NBoW, LSTM, CNN
+from model import NBoW, LSTM, CNN, Transformer
 
 
 def tokenize_example(example, tokenizer, max_length):
@@ -28,16 +29,22 @@ def numericalize_data(example, vocab):
     return {'ids': ids}
 
 
+def tokenize_and_numericalize_data(example, tokenizer):
+    ids = tokenizer(example['text'], truncation=True)['input_ids']
+    return {'ids': ids}
+
+
 def collate(batch, pad_index):
     batch_ids = [i['ids'] for i in batch]
     batch_ids = nn.utils.rnn.pad_sequence(batch_ids, padding_value=pad_index, batch_first=True)
-    batch_length = [i['length'] for i in batch]
-    batch_length = torch.stack(batch_length)
+    if 'length' in batch[0]:
+        batch_length = [i['length'] for i in batch]
+        batch_length = torch.stack(batch_length)
     batch_label = [i['label'] for i in batch]
     batch_label = torch.stack(batch_label)
     batch = {
         'ids': batch_ids,
-        'length': batch_length,
+        'length': batch_length if 'length' in batch[0] else None,
         'label': batch_label
     }
     return batch
@@ -121,6 +128,7 @@ def plot_and_save_metrics(name, metric_dict):
     ax.set_ylabel(name)
     plt.savefig(f"{config['OUTPUT']['figures']}/{config['MODEL']['name']}_{date.today()}_{name}.png")
 
+
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -131,69 +139,87 @@ if __name__ == '__main__':
     df = pd.read_csv(input_path, usecols=[input_X_col, input_y_col])
     df = df.rename(columns={input_X_col: 'text', input_y_col: 'label'})
     dataset = Dataset.from_pandas(df)
-    tts = dataset.train_test_split(test_size=0.1)
-    train_data, valid_data = tts['train'], tts['test']
+    # tts = dataset.train_test_split(test_size=0.1)
+    # train_data, valid_data = tts['train'], tts['test']
+    train_data = dataset
+    valid_data = dataset
 
-    tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
+    model_name = config['MODEL']['name']
+    if model_name == 'transformer':
+        transformer_name = config['TRANSFORMER']['name']
+        tokenizer = transformers.AutoTokenizer.from_pretrained(transformer_name)
+        train_data = train_data.map(tokenize_and_numericalize_data, fn_kwargs={'tokenizer': tokenizer})
+        valid_data = valid_data.map(tokenize_and_numericalize_data, fn_kwargs={'tokenizer': tokenizer})
 
-    max_length = 256
-    train_data = train_data.map(tokenize_example, fn_kwargs={'tokenizer': tokenizer, 'max_length': max_length})
-    valid_data = valid_data.map(tokenize_example, fn_kwargs={'tokenizer': tokenizer, 'max_length': max_length})
+        pad_index = tokenizer.pad_token_id
 
-    min_freq = 5
-    special_tokens = ['<unk>', '<pad>']
-    vocab = torchtext.vocab.build_vocab_from_iterator(
-        train_data['tokens'],
-        min_freq=min_freq,
-        specials=special_tokens
-    )
+        train_data = train_data.with_format(type='torch', columns=['ids', 'label'])
+        valid_data = valid_data.with_format(type='torch', columns=['ids', 'label'])
+    else:
+        tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
 
-    unk_index = vocab['<unk>']
-    pad_index = vocab['<pad>']
-    vocab.set_default_index(unk_index)
-    torch.save(vocab, config['VOCAB']['path'])
+        max_length = 256
+        train_data = train_data.map(tokenize_example, fn_kwargs={'tokenizer': tokenizer, 'max_length': max_length})
+        valid_data = valid_data.map(tokenize_example, fn_kwargs={'tokenizer': tokenizer, 'max_length': max_length})
 
-    train_data = train_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
-    valid_data = valid_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
+        min_freq = 5
+        special_tokens = ['<unk>', '<pad>']
+        vocab = torchtext.vocab.build_vocab_from_iterator(
+            train_data['tokens'],
+            min_freq=min_freq,
+            specials=special_tokens
+        )
 
-    train_data = train_data.with_format(type='torch', columns=['ids', 'label', 'length'])
-    valid_data = valid_data.with_format(type='torch', columns=['ids', 'label', 'length'])
+        unk_index = vocab['<unk>']
+        pad_index = vocab['<pad>']
+        vocab.set_default_index(unk_index)
+        torch.save(vocab, config['VOCAB']['path'])
 
-    batch_size = 64
+        train_data = train_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
+        valid_data = valid_data.map(numericalize_data, fn_kwargs={'vocab': vocab})
+
+        train_data = train_data.with_format(type='torch', columns=['ids', 'label', 'length'])
+        valid_data = valid_data.with_format(type='torch', columns=['ids', 'label', 'length'])
+
+        vocab_size = len(vocab)
+
+    batch_size = int(config['TRAINING']['batch_size'])
     collate = functools.partial(collate, pad_index=pad_index)
     train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, collate_fn=collate, shuffle=True)
     valid_dataloader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, collate_fn=collate)
 
-    vocab_size = len(vocab)
     embedding_dim = 300
     output_dim = len(train_data.unique('label'))
-    model_name = config['MODEL']['name']
     if model_name == 'nbow':
         model = NBoW(vocab_size, embedding_dim, output_dim, pad_index)
-        print(f'Using the NBoW model with {count_parameters(model):,} trainable parameters')
     elif model_name == 'lstm':
-        hidden_dim = 300
-        n_layers = 2
-        bidirectional = True
-        dropout_rate = 0.5
+        hidden_dim = int(config['LSTM']['hidden_dim'])
+        n_layers = int(config['LSTM']['n_layers'])
+        bidirectional = eval(config['LSTM']['bidirectional'])
+        dropout_rate = float(config['LSTM']['dropout_rate'])
         model = LSTM(vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout_rate,
                      pad_index)
         model.apply(initialize_weights)
-    if model_name == 'cnn':
-        n_filters = 100
-        filter_sizes = [3, 5, 7]
-        dropout_rate = 0.25
+    elif model_name == 'cnn':
+        n_filters = int(config['CNN']['n_filters'])
+        filter_sizes = eval(config['CNN']['filter_sizes'])
+        dropout_rate = float(config['CNN']['dropout_rate'])
         model = CNN(vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, dropout_rate, pad_index)
         model.apply(initialize_weights)
+    elif model_name == 'transformer':
+        freeze = eval(config['TRANSFORMER']['freeze'])
+        transformer = transformers.AutoModel.from_pretrained(transformer_name)
+        model = Transformer(transformer, output_dim, freeze)
     else:
         raise Exception('Model unknown... change the model name in config.ini')
     print(f'Using the {model_name} model with {count_parameters(model):,} trainable parameters')
 
-    vectors = torchtext.vocab.FastText()
-    pretrained_embedding = vectors.get_vecs_by_tokens(vocab.get_itos())
-    model.embedding.weight.data = pretrained_embedding
+    if model_name != 'transformer':
+        vectors = torchtext.vocab.FastText()
+        pretrained_embedding = vectors.get_vecs_by_tokens(vocab.get_itos())
+        model.embedding.weight.data = pretrained_embedding
 
-    lr = 5e-4
+    lr = float(config['TRAINING']['lr'])
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
 
@@ -201,7 +227,7 @@ if __name__ == '__main__':
     model = model.to(device)
     criterion = criterion.to(device)
 
-    n_epochs = 20
+    n_epochs = int(config['TRAINING']['epochs'])
     best_valid_loss = float('inf')
     losses = []
     accuracies = []
@@ -233,6 +259,8 @@ if __name__ == '__main__':
         print(f'epoch: {epoch + 1}')
         print(f'train_loss: {epoch_train_loss:.3f}, train_acc: {epoch_train_acc:.3f}')
         print(f'valid_loss: {epoch_valid_loss:.3f}, valid_acc: {epoch_valid_acc:.3f}')
+
+    #torch.save(model.state_dict(), f"{config['MODEL']['path']}_final.pt")
 
     plot_and_save_metrics('loss', losses)
     plot_and_save_metrics('accuracy', accuracies)

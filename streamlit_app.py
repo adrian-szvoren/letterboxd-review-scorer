@@ -41,44 +41,49 @@ if __name__ == '__main__':
         label_visibility='collapsed'
     )
 
-    platform = st.selectbox(
-        'Platform selection',
-        [
-            '',
-            'Letterboxd (0.5 - 5)',
-            'IMDB (1 - 10)',
-            'Rotten Tomatoes (0 - 100%)'
-        ],
-        label_visibility='collapsed'
-    )
+    # platform = st.selectbox(
+    #     'Platform selection',
+    #     [
+    #         '',
+    #         'Letterboxd (0.5 - 5)',
+    #         'IMDB (1 - 10)',
+    #         'Rotten Tomatoes (0 - 100%)'
+    #     ],
+    #     label_visibility='collapsed'
+    # )
+    platform = 'Letterboxd'
+
+    button = st.button('Calculate')
 
     scores = None
-    try:
-        scores = predict_score(text_input, model, tokenizer, vocab, device, min_length, pad_index)
-        scores = scale_scores(scores, platform)
-        top = scores.iloc[scores['confidence'].idxmax()]
+    if button:
+        try:
+            scores = predict_score(text_input, model, tokenizer, vocab, device, min_length, pad_index)
+            scores = scale_scores(scores, platform)
+            top = scores.iloc[scores['confidence'].idxmax()]
 
-        score = top['score']
-        score_verbal = ''
-        if 'Letterboxd' in platform:
-            stars = '★' * math.floor(score)
-            if score % 1 == 0.5:
-                stars += '½'
-            stars += '☆' * math.floor(5 - score)
-            score_verbal = f'{stars} ({score})'
-        elif 'IMDB' in platform:
-            score_verbal = f':star: **{int(score)}**/10'
-        elif 'Rotten Tomatoes' in platform:
-            if score >= 60:
-                score_rt_verbal = ':tomato:'
+            score = top['score']
+            score_verbal = ''
+            if 'Letterboxd' in platform:
+                stars = '★' * math.floor(score)
+                if score % 1 == 0.5:
+                    stars += '½'
+                stars += '☆' * math.floor(5 - score)
+                score_verbal = f'{stars} ({score})'
+            elif 'IMDB' in platform:
+                score_verbal = f':star: **{int(score)}**/10'
+            elif 'Rotten Tomatoes' in platform:
+                if score >= 60:
+                    score_rt_verbal = ':tomato:'
+                else:
+                    score_rt_verbal = ':microbe:'
+                score_verbal = f'{score_rt_verbal} {score}%'
             else:
-                score_rt_verbal = ':microbe:'
-            score_verbal = f'{score_rt_verbal} {score}%'
-        else:
-            raise RuntimeError
-        st.subheader(f'Movie score: {score_verbal}')
+                raise RuntimeError
+            st.subheader(f'Movie score: {score_verbal}')
+            st.write('')
 
-        with st.expander('Score confidence details'):
+            # with st.expander('Score confidence details'):
             plot = alt.Chart(scores).mark_bar().encode(
                 x=alt.X('score:O', axis=alt.Axis(labelAngle=0)),
                 y=alt.Y('confidence:Q', title='confidence (%)'),
@@ -89,5 +94,5 @@ if __name__ == '__main__':
                 )
             )
             st.altair_chart(plot, use_container_width=True)
-    except RuntimeError or TypeError:
-        pass
+        except RuntimeError or TypeError:
+            pass
