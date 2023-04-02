@@ -188,8 +188,8 @@ if __name__ == '__main__':
     train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, collate_fn=collate, shuffle=True)
     valid_dataloader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, collate_fn=collate)
 
-    embedding_dim = 300
-    output_dim = len(train_data.unique('label'))
+    embedding_dim = config['MODEL']['embedding_dim']
+    output_dim = config['MODEL']['output_dim']
     if model_name == 'nbow':
         model = NBoW(vocab_size, embedding_dim, output_dim, pad_index)
     elif model_name == 'lstm':
