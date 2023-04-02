@@ -29,8 +29,8 @@ def load_models(config):
     vocab = torch.load(config['VOCAB']['path'])
     vocab_size = len(vocab)
     pad_index = vocab['<pad>']
-    embedding_dim = config['MODEL']['embedding_dim']
-    output_dim = config['MODEL']['output_dim']
+    embedding_dim = int(config['MODEL']['embedding_dim'])
+    output_dim = int(config['MODEL']['output_dim'])
     model_name = config['MODEL']['name']
     min_length = 1
     if model_name == 'nbow':
