@@ -4,7 +4,7 @@ matplotlib
 numpy
 pandas
 streamlit
-torch
-torchtext
+torch==2.2.2
+torchtext==0.17.2
 tqdm
 transformers
